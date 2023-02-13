@@ -9,8 +9,15 @@ NOTE: there is a main assumption when running seq_scout inside a worker node tha
 from pyspark.sql.functions import col, udf
 from pyspark.sql.functions import sum as fsum
 from pyspark.sql.types import StructType, StructField, IntegerType
+from pyspark.sql import SparkSession
 import math
 import random
+from utils import PriorityQueue, to_imm_pattern, mutable_seq_copy, save_patterns
+import pickle
+import sys
+from time import time
+import gc
+import subprocess
 
 
 def seq_scout(data, data_plus,target_class, numerics_max, top_k, iterations, theta, alpha):
@@ -43,7 +50,7 @@ def seq_scout(data, data_plus,target_class, numerics_max, top_k, iterations, the
     # create priority queue for storing each class sequence and its UCB score
     # IMPORTANT: here data_plus is completely dumped on the memory. Be careful.
     scores = PriorityQueue(data_plus)
-    
+    tick = time()
     for N in range(1,iterations+1):
         # pop the sequence to be generalized
         _, Ni, mean_quality, sequence = scores.pop_first() 
@@ -57,6 +64,11 @@ def seq_scout(data, data_plus,target_class, numerics_max, top_k, iterations, the
         updated_quality = (Ni * mean_quality + new_qual) / (Ni + 1)
         ucb_score = compute_ucb(updated_quality, Ni + 1, N)
         scores.add((-ucb_score, Ni + 1, updated_quality, sequence))
+        if N%100 == 0:
+            tock = time()
+            print(f"reached iteration {N} for class " + target_class )
+            print(f"elapsed time:{tock-tick}")
+            tick = tock
         
     
     return pi.get_top_k() # priority queue filters automatically if theta <1
@@ -220,3 +232,42 @@ def is_subsequence(subsequence,classsub, sequence_input, sequence_num, classsupe
             return (is_sub,0)
     else:
         return is_sub
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 5:
+        print("ERROR: Missing arguments. requiring top_k, iterations, theta and alpha")
+    
+    spark = SparkSession.builder.appName("RocketLeagueFEseq").getOrCreate()
+    df = spark.read.format("json").load("hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df")
+    classes = df.select(col("class")).distinct().collect()
+    class_list = [c["class"] for c in classes]
+    # remove the noise class
+    class_list.remove("-1")
+    
+    # load numerics_max
+    with open("numerics_max.pickle", "rb") as file:
+        numerics_max = pickle.load(file)
+        
+    print("classes to be processed:")
+    print(class_list)
+    for target in class_list:
+        # isolate all the sequences of a given classes.
+        # NOTE: we are still under the assumption that the class has a few 
+        # examples. With bigger dataset the following data_plus
+        # should be splitted and the seq_scout should be run on each of its split
+        data_plus = df.filter(col("class")==target)
+        print("Starting seq_scout for class " + target)
+        patterns = seq_scout(df, data_plus,target, numerics_max, int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]))
+        patt_filename = "pattern_for_class_" + target + ".pickle"
+        save_patterns(patterns, patt_filename)
+        
+        # saving the patterns on the hdfs
+        command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -moveFromLocal -f ./" +  patt_filename + " /user/ubuntu/dataset"
+        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
+        output, error = process.communicate()
+        print(output)
+        print(error)
+        
+        gc.collect()
+    spark.stop()

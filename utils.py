@@ -79,9 +79,9 @@ class PriorityQueue(object):
         seq_set: set containing all the sequences already in the queue. Avoids re-inserting pattern or sequences.
     """
     def __init__(self, data=None, k=1,theta=1, cap_length=False):
-    """
-    NOTE: if data is different from None and is, in fact a pyspark dataset, it will 
-    """
+        """
+        NOTE: if data is different from None and is, in fact a pyspark dataset, it will 
+        """
         self.k = k
         self.theta=theta
         self.cap_length=cap_length if k is not None else False

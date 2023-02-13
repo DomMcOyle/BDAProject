@@ -7,6 +7,8 @@ import json
 import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, explode, monotonically_increasing_id, posexplode, struct, collect_list
+import pickle
+from hdfs import InsecureClient
 
 def read_dataset(path):
     """
@@ -139,7 +141,7 @@ if __name__ == "__main__":
         spark = SparkSession.builder.appName("RocketLeagueFE").getOrCreate()
         # reads the dataframe
         
-        df = spark.read.format("json").load(sys.argv[2])
+        df = spark.read.format("json").load(sys.argv[2]+"source.json")
         print("dataframe loaded")
         # adds the "id" column, associating an id to each example
         df = df.withColumn("id", monotonically_increasing_id())
@@ -154,6 +156,8 @@ if __name__ == "__main__":
         dfj = df.join(encoded_numerics, col("id")==col("_id")).select("id","input_sequence" ,"enc_num_sequence", "class")
         print("result:")
         dfj.show(3)
+        with open("numerics_max.pickle", "wb") as file:
+            pickle.dump(numerics_max, file)
         # saves the dataframe on the hdfs.
         # this helps to speed up operations, otherwise the spark engine had to
         # redo all the previous operations at each iteration
