@@ -138,7 +138,7 @@ if __name__ == "__main__":
             file.write(json.dumps(data))
             
     elif sys.argv[1] == "gen_dataframe": 
-        spark = SparkSession.builder.appName("RocketLeagueFE").getOrCreate()
+        spark = SparkSession.builder.appName("RocketLeagueDP").getOrCreate()
         # reads the dataframe
         
         df = spark.read.format("json").load(sys.argv[2]+"source.json")
@@ -161,7 +161,30 @@ if __name__ == "__main__":
         # saves the dataframe on the hdfs.
         # this helps to speed up operations, otherwise the spark engine had to
         # redo all the previous operations at each iteration
-        dfj.write.format("json").save(sys.argv[2] + "processed_df")
+        # we also need to split the dataset in training and test in order to obtain
+        # comparable results
+        
+        # the sample by method does not return the exact number of expected samples
+        # for each class, an samplebykeyexact is not implemented currently in python
+        # thus fractions have been handcrafted to split the dataset in a 80-20 way in stratified fashon
+        fractions = {"7":0.85,
+        '-1':0.80, 
+        '3':0.625, 
+        '5':0.74, 
+        '6':0.8, 
+        '1':0.77,
+        '2':0.71}
+        sampled_df = dfj.stat.sampleBy("class", h, 42)
+        print("Training set samples:")
+        sampled_df.groupBy("class").count().show()
+        
+        # saving the training set
+        sampled_df.write.format("json").save(sys.argv[2] + "processed_df")
+        
+        test_df = dfj.join(sampled_df, test_df.id == sampled_df.id, "leftanti")
+        
+        # saving the test
+        test_df.write.format("json").save(sys.argv[2] + "processed_test")
     else:
         print("ERROR: wrong arguments. add \"gen_json\" or \"gen_dataframe\" and the respective target folder")
     
