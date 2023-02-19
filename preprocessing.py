@@ -107,6 +107,7 @@ def convert_numerics(df, numerics_domains):
     workdf = workdf.orderBy("_id", "pos")
     workdf = workdf.groupBy("_id", "pos").agg(collect_list(struct([col(i) for i in needed_columns])).alias("enc_num_sequence"))
     return workdf.groupBy("_id").agg(collect_list(col("enc_num_sequence")[0]).alias("enc_num_sequence"))
+    
 
 if __name__ == "__main__":
     """
@@ -155,7 +156,7 @@ if __name__ == "__main__":
         # joins the original dataframe with the encoded one and applies 
         dfj = df.join(encoded_numerics, col("id")==col("_id")).select("id","input_sequence" ,"enc_num_sequence", "class")
         print("result:")
-        dfj.show(3)
+        dfj.show(5)
         with open("numerics_max.pickle", "wb") as file:
             pickle.dump(numerics_max, file)
         # saves the dataframe on the hdfs.
@@ -166,25 +167,50 @@ if __name__ == "__main__":
         
         # the sample by method does not return the exact number of expected samples
         # for each class, an samplebykeyexact is not implemented currently in python
-        # thus fractions have been handcrafted to split the dataset in a 80-20 way in stratified fashon
-        fractions = {"7":0.85,
-        '-1':0.80, 
-        '3':0.625, 
-        '5':0.74, 
-        '6':0.8, 
-        '1':0.77,
-        '2':0.71}
-        sampled_df = dfj.stat.sampleBy("class", h, 42)
-        print("Training set samples:")
-        sampled_df.groupBy("class").count().show()
+        # thus since the dataset is already enough shuffled, we are gonna select the first
+        # 0.8 of examples taken by ordering them. It is not a random split, but its
+        # the closest thing to a reproducible split we can add
         
+        # we take the counts for each class and compute their respective 80% fraction
+        counts = df.groupBy("class").count().collect()
+        num_ex_required = {i["class"]:round(0.8*i["count"]) for i in counts}
+        num_ex_per_class = {i["class"]:i["count"] for i in counts}
+        
+        # we craft the where expression to be run in order to isolate the correct number of examples required
+        where_expr = ""
+        j = 0
+        for i in sorted(num_ex_per_class.keys()):
+            where_expr = where_expr + "(class==" + i + " AND sample_id<" + str(num_ex_required[i]+j) + ") OR "
+            j = j + num_ex_per_class[i]
+        where_expr = where_expr[:-4] # discarding last or
+        
+        # isolating the ids
+        df_samp = df.orderBy("class", "id")\
+                    .withColumn("sample_id",monotonically_increasing_id())\
+                    .where(where_expr)\
+                    .withColumnRenamed("id", "_id")\
+                    .select("_id")
+        
+        training_df = dfj.join(df_samp, dfj.id == df_samp._id)\
+                         .select("id","input_sequence" ,"enc_num_sequence", "class")
+                         
+        print("showing training dataframe:")
+        training_df.show(5)
+        training_df.groupBy("class").count().show()
         # saving the training set
-        sampled_df.write.format("json").save(sys.argv[2] + "processed_df")
+        training_df.write.format("json").save(sys.argv[2] + "processed_df")
         
-        test_df = dfj.join(sampled_df, test_df.id == sampled_df.id, "leftanti")
+        test_df = dfj.join(df_samp, dfj.id == df_samp._id, "leftanti")
+        print("showing test dataframe:")
+        test_df.show(5)
+        test_df.groupBy("class").count().show()
         
+        print("proof of disjunction")
+        test_df.join(training_df, training_df.id == test_df.id).show()
         # saving the test
         test_df.write.format("json").save(sys.argv[2] + "processed_test")
+        
+        spark.quit()
     else:
         print("ERROR: wrong arguments. add \"gen_json\" or \"gen_dataframe\" and the respective target folder")
     
