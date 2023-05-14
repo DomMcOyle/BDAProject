@@ -9,6 +9,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, explode, monotonically_increasing_id, posexplode, struct, collect_list
 import pickle
 from hdfs import InsecureClient
+from utils import save_df
+
 
 def read_dataset(path):
     """
@@ -198,7 +200,7 @@ if __name__ == "__main__":
         training_df.show(5)
         training_df.groupBy("class").count().show()
         # saving the training set
-        training_df.write.format("json").save(sys.argv[2] + "processed_df")
+        save_df(training_df, sys.argv[2], "processed_df")
         
         test_df = dfj.join(df_samp, dfj.id == df_samp._id, "leftanti")
         print("showing test dataframe:")
@@ -208,7 +210,7 @@ if __name__ == "__main__":
         print("proof of disjunction")
         test_df.join(training_df, training_df.id == test_df.id).show()
         # saving the test
-        test_df.write.format("json").save(sys.argv[2] + "processed_test")
+        save_df(test_df, sys.argv[2], "processed_test")
         
         spark.quit()
     else:

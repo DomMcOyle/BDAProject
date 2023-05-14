@@ -6,6 +6,44 @@ Python file containig utility functions for the seq_scout algorithm
 import pickle
 import heapq
 
+def save_df(df, path, df_name):
+  """
+  Function to serialize a pyspark dataframe to json while also saving its schema.
+
+  Params:
+    df: dataframe to serialize
+    path: root directory where the files will be saved. The function will generate one json file 
+          for the schema and another one for data.
+    df_name: string containing the name of the dataframe to save (added to both json files)
+  """
+  schema_to_save = df.schema.json()  
+  with open(path + "%s_schema.json"%df_name, "w") as json_file:
+    json_file.write(json.dumps(schema_to_save, indent = 4))
+  df.write.json(path + "/%s.json"%df_name, mode="overwrite")
+
+
+def load_df(path, df_name):
+  """
+  Function to load a pyspark dataframe with the relative schema.
+
+  Params: 
+    path: root directory of the files of the 
+          serialized dataset and its schema
+    df_name: string containing the name of the saved dataframe
+  Returns:
+    loaded_df: the loaded dataset with the loaded schema
+  """
+  with open(path + "%s_schema.json"%df_name, "r") as json_file:
+    json_obj = json.load(json_file)
+    loaded_schema = StructType.fromJson(json.loads(json_obj))
+  loaded_df = spark.read.format("json") \
+                        .option("header", "true") \
+                        .schema(loaded_schema) \
+                        .load(path + "/%s.json"%df_name)
+  return loaded_df
+
+
+
 def import_imm_sequence(seq):
     """
     Function importing a dataframe row as a immutable sequence.

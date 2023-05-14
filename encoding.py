@@ -3,7 +3,8 @@ Python script containg the procedure to encode the dataset given the found patte
 
 """
 
-from utils import is_subsequence
+from utils import save_df
+from seq_scout import is_subsequence
 from pyspark.ml.feature import VectorAssembler
 from pyspark.sql.functions import udf,col
 from pyspark.sql.types import IntegerType
@@ -84,8 +85,8 @@ if __name__ == "__main__":
     print("showing results:")
     enc_dataset.show(3)
     enc_test.show(3)
-    enc_dataset.write.format("json").save(sys.argv[2] + "encoded_df")
-    enc_test.write.format("json").save(sys.argv[2] + "encoded_test")
+    save_df(enc_dataset, sys.argv[2], "encoded_df")
+    save_df(enc_test, sys.argv[2], "encoded_test")
     spark.quit()
         
     

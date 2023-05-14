@@ -12,7 +12,7 @@ from pyspark.sql.types import StructType, StructField, IntegerType
 from pyspark.sql import SparkSession
 import math
 import random
-from utils import PriorityQueue, to_imm_pattern, mutable_seq_copy, save_patterns
+from utils import PriorityQueue, to_imm_pattern, mutable_seq_copy, save_patterns, load_df
 import pickle
 import sys
 from time import time
@@ -239,7 +239,9 @@ if __name__ == "__main__":
         print("ERROR: Missing arguments. requiring top_k, iterations, theta and alpha")
     
     spark = SparkSession.builder.appName("RocketLeagueFEseq").getOrCreate()
-    df = spark.read.format("json").load("hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df")
+    
+    
+    df = load_df('processed_df', "hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df")
     classes = df.select(col("class")).distinct().collect()
     class_list = [c["class"] for c in classes]
     # remove the noise class
