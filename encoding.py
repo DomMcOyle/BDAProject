@@ -34,7 +34,7 @@ def encode_dataset(dataframe, patterns):
     return dataframe, index - 1
 
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     """
     The script will encode the dataset and produce a new dataframe in the same folder of the processed one.
     """
@@ -57,20 +57,28 @@ if __name__ = "__main__":
     
     # loading the patterns
     for c in class_list:
-        with open("patterns_for_class_" + c + ".pickle", "rb") as pat_file:
+        with open("pattern_for_class_" + c + ".pickle", "rb") as pat_file:
             patterns = patterns + pickle.load(pat_file)
-            
+    
+    udf_change_class = udf(lambda x: 0 if x<0 else x, IntegerType())        
+        
     enc_dataset, num_cols = encode_dataset(df, patterns)
     new_cols = [str(i) for i in range(num_cols+1)]
     enc_dataset = enc_dataset.select(["id","class"] + new_cols)
     va = VectorAssembler(inputCols=new_cols, outputCol="features")
     enc_dataset = va.transform(enc_dataset).select("id","class", "features")
+    #changes required for the ML algorithms
+    enc_dataset = enc_dataset.withColumn('class', enc_dataset["class"].cast(IntegerType()))
+    enc_dataset = enc_dataset.withColumn('class', udf_change_class(enc_dataset['class']))
     
     enc_test, num_cols = encode_dataset(test, patterns)
     new_cols = [str(i) for i in range(num_cols+1)]
     enc_test = enc_test.select(["id","class"] + new_cols)
     va = VectorAssembler(inputCols=new_cols, outputCol="features")
     enc_test = va.transform(enc_test).select("id","class", "features")
+    #changes required for the ML algorithms
+    enc_test = enc_test.withColumn('class', enc_test["class"].cast(IntegerType()))
+    enc_test = enc_test.withColumn('class', udf_change_class(enc_test['class']))
     
     
     print("showing results:")
