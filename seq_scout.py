@@ -241,7 +241,7 @@ if __name__ == "__main__":
     spark = SparkSession.builder.appName("RocketLeagueFEseq").getOrCreate()
     
     
-    df = load_df('processed_df', "hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df")
+    df = load_df('processed_df', "hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df", spark)
     classes = df.select(col("class")).distinct().collect()
     class_list = [c["class"] for c in classes]
     # remove the noise class

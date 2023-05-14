@@ -5,6 +5,8 @@ Python file containig utility functions for the seq_scout algorithm
 """
 import pickle
 import heapq
+import json
+from pyspark.sql.types import StructType
 
 def save_df(df, path, df_name):
   """
@@ -22,7 +24,7 @@ def save_df(df, path, df_name):
   df.write.json(path + "/%s.json"%df_name, mode="overwrite")
 
 
-def load_df(path, df_name):
+def load_df(path, df_name, spark):
   """
   Function to load a pyspark dataframe with the relative schema.
 
@@ -30,6 +32,7 @@ def load_df(path, df_name):
     path: root directory of the files of the 
           serialized dataset and its schema
     df_name: string containing the name of the saved dataframe
+    spark: reference to the current spark session
   Returns:
     loaded_df: the loaded dataset with the loaded schema
   """
