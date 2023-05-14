@@ -6,7 +6,8 @@ Python file containig utility functions for the seq_scout algorithm
 import pickle
 import heapq
 import json
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, IntegerType, StructField
+from seq_scout import is_subsequence
 
 def save_df(df, path, df_name):
   """
@@ -122,6 +123,7 @@ class PriorityQueue(object):
     def __init__(self, data=None, k=1,theta=1, cap_length=False):
         """
         NOTE: if data is different from None and is, in fact a pyspark dataset, it will 
+        load the full dataframe on the main memory
         """
         self.k = k
         self.theta=theta
@@ -143,17 +145,77 @@ class PriorityQueue(object):
             if self.cap_length and len(self.heap)>self.k:
                 self.heap = heapq.nsmallest(self.k, self.heap)
                 self.seq_set = set([i[-1] for i in self.heap])
-                #TODO add filtering if necessary
+                
     def pop_first(self):
         head = heapq.heappop(self.heap)
         self.seq_set.remove(head[-1])
         return head
     
-    def get_top_k(self):
+    def get_top_k(self, data=None):
         if self.theta == 1:
             return heapq.nsmallest(self.k, self.heap)
         else:
-            return 0
+            return self.filter_patterns(data)
+            
+            
+    def filter_patterns(self, data):
+    """
+    Method to filter patterns given the data, according to the jaccard index
+    """ 
+        assert data is not None
+        elem_list = list(self.heap)
+        elem_list.sort()
+        
+        output = []
+        for i in range(len(elem_list)):
+            similar = False
+            for o in output:
+                if self.similarity(elem_list[i][-1], o[-1], data)>self.theta:
+                    similar=True
+                    break
+            if not similar:
+                output.append(elem_list[i])
+            
+            if self.k is not None and len(output) == self.k:
+                break
+        return output
+        
+     def similarity(self, seq1, seq2, data):
+     """
+     Function computing the similarity between seq1 and seq2 considering data
+        params:
+            seq1: sequence to compare
+            seq2: sequence to compare
+            data: pyspark dataframe containing the sequences to use for computing the jaccard score
+        returns:
+            the jaccard score of |sequenceces generalized by seq1 AND seq2|/|sequences generalized by
+                seq1 or seq2 or both|
+     
+     """
+            def helper(x,y):
+            """
+            Helper function to compute the values of intersection and union for the score
+            """
+                a = is_subsequence(seq1, None, x,y, None)
+                b = is_subsequence(seq2, None, x,y, None)
+                return a*b, (1 if a==1 or b==1 else 0)
+
+        outschema = StructType([
+                        StructField("intersection", IntegerType(),False),
+                        StructField("union", IntegerType(), False)
+        ])
+        udf_jaccard = udf(lambda x,y: helper(x,y), outschema)
+        ext_data = data.select(udf_subsequence(data.input_sequence,
+                                               data.enc_num_sequence).alias("tmp"))\
+                                               .select(fsum("tmp.intersection").alias("intersection"),
+                                                       fsum("tmp.union").alias("union"))
+        sums = ext_data.head()
+        intersection = sums["intersection"]
+        union = sums["union"]
+        
+        return intersection/union
+        
+        
             #TODO add filtering
     
     

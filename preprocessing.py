@@ -10,8 +10,6 @@ from pyspark.sql.functions import col, lit, explode, monotonically_increasing_id
 import pickle
 from hdfs import InsecureClient
 from utils import save_df
-
-
 def read_dataset(path):
     """
     Function to read the dataset from the text file. Adapted from the one on the original repository

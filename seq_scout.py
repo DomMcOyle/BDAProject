@@ -71,7 +71,7 @@ def seq_scout(data, data_plus,target_class, numerics_max, top_k, iterations, the
             tick = tock
         
     
-    return pi.get_top_k() # priority queue filters automatically if theta <1
+    return pi.get_top_k(data) # priority queue filters automatically if theta <1
 
 def play_arm(sequence, data, target_class, numerics_max, alpha, data_support, class_support): 
     """
