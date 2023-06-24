@@ -3,8 +3,7 @@ Python script containg the procedure to encode the dataset given the found patte
 
 """
 
-from utils import save_df
-from seq_scout import is_subsequence
+from utils import save_df, is_subsequence
 from pyspark.ml.feature import VectorAssembler
 from pyspark.sql.functions import udf,col
 from pyspark.sql.types import IntegerType
@@ -61,7 +60,9 @@ if __name__ == "__main__":
         with open("pattern_for_class_" + c + ".pickle", "rb") as pat_file:
             patterns = patterns + pickle.load(pat_file)
     
-    udf_change_class = udf(lambda x: 0 if x<0 else x, IntegerType())        
+    udf_change_class = udf(lambda x: 0 if x<0 else x, IntegerType())
+    # The following function fixes the 'gap' between class ids in the dataset
+    udf_fix_gap = udf(lambda y: y if y<4 else y-1, IntegerType())
         
     enc_dataset, num_cols = encode_dataset(df, patterns)
     new_cols = [str(i) for i in range(num_cols+1)]
@@ -71,6 +72,8 @@ if __name__ == "__main__":
     #changes required for the ML algorithms
     enc_dataset = enc_dataset.withColumn('class', enc_dataset["class"].cast(IntegerType()))
     enc_dataset = enc_dataset.withColumn('class', udf_change_class(enc_dataset['class']))
+    enc_dataset = enc_dataset.withColumn('class', udf_fix_gap(enc_dataset['class']))
+    
     
     enc_test, num_cols = encode_dataset(test, patterns)
     new_cols = [str(i) for i in range(num_cols+1)]
@@ -80,6 +83,7 @@ if __name__ == "__main__":
     #changes required for the ML algorithms
     enc_test = enc_test.withColumn('class', enc_test["class"].cast(IntegerType()))
     enc_test = enc_test.withColumn('class', udf_change_class(enc_test['class']))
+    enc_test = enc_test.withColumn('class', udf_fix_gap(enc_test['class']))
     
     
     print("showing results:")

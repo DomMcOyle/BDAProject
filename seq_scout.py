@@ -12,7 +12,7 @@ from pyspark.sql.types import StructType, StructField, IntegerType
 from pyspark.sql import SparkSession
 import math
 import random
-from utils import PriorityQueue, to_imm_pattern, mutable_seq_copy, save_patterns, load_df
+from utils import PriorityQueue, to_imm_pattern, mutable_seq_copy, save_patterns, load_df, is_subsequence
 import pickle
 import sys
 from time import time
@@ -190,48 +190,7 @@ def compute_WRAcc(data, subsequence, target_class, data_support, class_support):
     
     return wracc
 
-def is_subsequence(subsequence,classsub, sequence_input, sequence_num, classsuper):
-    """
-    Function used to check whether a pattern generalizes a sequence and eventually if they belong to the same class
-    
-    params:
-        subsequence: pattern to use for the check
-        classsub: class of the pattern subsequence. If None, The function will only return if
-                  subsequence generalizes the input sequence (1) or not (0)
-        sequence_input: input part of the sequence to be checked
-        sequence_num: numeric part of the sequence to be checked
-        classsuper: class of the sequence considered
-    returns:
-        if classub is None:
-            an integer. 1 if subsequence generalizes [sequence_input, sequence_num], 0 otherwise
-        else:
-            a tuple where:
-            tuple[0] is an integer. 1 if subsequence generalizes [sequence_input, sequence_num], 0 otherwise
-            tuple[1] is an integer. 1 tuple[0]==1 and subsequence and the input sequence have the same class, 0 otherwise
-    """
-    # sequence input is a list of lists of strings
-    # sequence num is a list of rows
-    i_sub = 0
-    i_seq = 0
-    while i_sub<len(subsequence) and i_seq<len(sequence_input):
-        if subsequence[i_sub][0].issubset(sequence_input[i_seq]):
-            if all([value >= subsequence[i_sub][1][numeric][0] and value <= subsequence[i_sub][1][numeric][1] for numeric, value in
-                    sequence_num[i_seq].asDict().items()]):
-                i_sub += 1
-        i_seq += 1
-        
-    if i_sub == len(subsequence):
-        is_sub = 1
-    else:
-        is_sub = 0
-    
-    if classsub is not None:
-        if is_sub == 1 and classsub == classsuper:
-            return (is_sub,1)
-        else:
-            return (is_sub,0)
-    else:
-        return is_sub
+
 
 
 if __name__ == "__main__":

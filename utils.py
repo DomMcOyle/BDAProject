@@ -7,7 +7,6 @@ import pickle
 import heapq
 import json
 from pyspark.sql.types import StructType, IntegerType, StructField
-from seq_scout import is_subsequence
 
 def save_df(df, path, df_name):
   """
@@ -107,6 +106,49 @@ def load_patterns(filename):
     with open(filename, "rb") as file:
         to_return = pickle.load(filename)
     return to_return
+    
+def is_subsequence(subsequence,classsub, sequence_input, sequence_num, classsuper):
+    """
+    Function used to check whether a pattern generalizes a sequence and eventually if they belong to the same class
+    
+    params:
+        subsequence: pattern to use for the check
+        classsub: class of the pattern subsequence. If None, The function will only return if
+                  subsequence generalizes the input sequence (1) or not (0)
+        sequence_input: input part of the sequence to be checked
+        sequence_num: numeric part of the sequence to be checked
+        classsuper: class of the sequence considered
+    returns:
+        if classub is None:
+            an integer. 1 if subsequence generalizes [sequence_input, sequence_num], 0 otherwise
+        else:
+            a tuple where:
+            tuple[0] is an integer. 1 if subsequence generalizes [sequence_input, sequence_num], 0 otherwise
+            tuple[1] is an integer. 1 tuple[0]==1 and subsequence and the input sequence have the same class, 0 otherwise
+    """
+    # sequence input is a list of lists of strings
+    # sequence num is a list of rows
+    i_sub = 0
+    i_seq = 0
+    while i_sub<len(subsequence) and i_seq<len(sequence_input):
+        if subsequence[i_sub][0].issubset(sequence_input[i_seq]):
+            if all([value >= subsequence[i_sub][1][numeric][0] and value <= subsequence[i_sub][1][numeric][1] for numeric, value in
+                    sequence_num[i_seq].asDict().items()]):
+                i_sub += 1
+        i_seq += 1
+        
+    if i_sub == len(subsequence):
+        is_sub = 1
+    else:
+        is_sub = 0
+    
+    if classsub is not None:
+        if is_sub == 1 and classsub == classsuper:
+            return (is_sub,1)
+        else:
+            return (is_sub,0)
+    else:
+        return is_sub    
 
 class PriorityQueue(object):
     """
@@ -159,9 +201,9 @@ class PriorityQueue(object):
             
             
     def filter_patterns(self, data):
-    """
-    Method to filter patterns given the data, according to the jaccard index
-    """ 
+        """
+        Method to filter patterns given the data, according to the jaccard index
+        """ 
         assert data is not None
         elem_list = list(self.heap)
         elem_list.sort()
@@ -180,39 +222,38 @@ class PriorityQueue(object):
                 break
         return output
         
-     def similarity(self, seq1, seq2, data):
-     """
-     Function computing the similarity between seq1 and seq2 considering data
-        params:
-            seq1: sequence to compare
-            seq2: sequence to compare
-            data: pyspark dataframe containing the sequences to use for computing the jaccard score
-        returns:
-            the jaccard score of |sequenceces generalized by seq1 AND seq2|/|sequences generalized by
-                seq1 or seq2 or both|
-     
-     """
-            def helper(x,y):
+    def similarity(self, seq1, seq2, data):
+        """
+        Function computing the similarity between seq1 and seq2 considering data
+            Params:
+                 seq1: sequence to compare
+                 seq2: sequence to compare
+                 data: pyspark dataframe containing the sequences to use for computing the jaccard score
+             returns:
+                 the jaccard score of |sequenceces generalized by seq1 AND seq2|/|sequences generalized by
+                     seq1 or seq2 or both|
+
+        """
+        def helper(x,y):
             """
             Helper function to compute the values of intersection and union for the score
             """
-                a = is_subsequence(seq1, None, x,y, None)
-                b = is_subsequence(seq2, None, x,y, None)
-                return a*b, (1 if a==1 or b==1 else 0)
+            a = is_subsequence(seq1, None, x,y, None)
+            b = is_subsequence(seq2, None, x,y, None)
+            return a*b, (1 if a==1 or b==1 else 0)
 
         outschema = StructType([
-                        StructField("intersection", IntegerType(),False),
-                        StructField("union", IntegerType(), False)
-        ])
+                    StructField("intersection", IntegerType(),False),
+                    StructField("union", IntegerType(), False)])
         udf_jaccard = udf(lambda x,y: helper(x,y), outschema)
         ext_data = data.select(udf_subsequence(data.input_sequence,
-                                               data.enc_num_sequence).alias("tmp"))\
-                                               .select(fsum("tmp.intersection").alias("intersection"),
-                                                       fsum("tmp.union").alias("union"))
+                                           data.enc_num_sequence).alias("tmp"))\
+                                           .select(fsum("tmp.intersection").alias("intersection"),
+                                                   fsum("tmp.union").alias("union"))
         sums = ext_data.head()
         intersection = sums["intersection"]
         union = sums["union"]
-        
+
         return intersection/union
         
         
