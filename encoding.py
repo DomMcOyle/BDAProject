@@ -3,7 +3,7 @@ Python script containg the procedure to encode the dataset given the found patte
 
 """
 
-from utils import save_df, is_subsequence
+from utils import save_df, is_subsequence, mutable_seq_copy
 from pyspark.ml.feature import VectorAssembler
 from pyspark.sql.functions import udf,col
 from pyspark.sql.types import IntegerType
@@ -44,8 +44,8 @@ if __name__ == "__main__":
     spark = SparkSession.builder.appName("RocketLeagueDE").getOrCreate()
     # reads the dataframe
         
-    df = spark.read.format("json").load(sys.argv[2]+ "processed_df")
-    test = spark.read.format("json").load(sys.argv[2]+ "processed_test")
+    df = spark.read.format("json").load(sys.argv[1]+ "processed_df")
+    test = spark.read.format("json").load(sys.argv[1]+ "processed_test")
     print("dataframes loaded")
     
     classes = df.select(col("class")).distinct().collect()
@@ -89,9 +89,9 @@ if __name__ == "__main__":
     print("showing results:")
     enc_dataset.show(3)
     enc_test.show(3)
-    save_df(enc_dataset, sys.argv[2], "encoded_df")
-    save_df(enc_test, sys.argv[2], "encoded_test")
-    spark.quit()
+    save_df(enc_dataset, sys.argv[1], "encoded_df")
+    save_df(enc_test, sys.argv[1], "encoded_test")
+    spark.stop()
         
     
     

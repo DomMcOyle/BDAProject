@@ -6,6 +6,7 @@ Python file containig utility functions for the seq_scout algorithm
 import pickle
 import heapq
 import json
+import subprocess
 from pyspark.sql.types import StructType, IntegerType, StructField
 
 def save_df(df, path, df_name):
@@ -19,8 +20,16 @@ def save_df(df, path, df_name):
     df_name: string containing the name of the dataframe to save (added to both json files)
   """
   schema_to_save = df.schema.json()  
-  with open(path + "%s_schema.json"%df_name, "w") as json_file:
+  spath = './' if 'hdfs' in path else path
+  with open(spath + "%s_schema.json"%df_name, "w") as json_file:
     json_file.write(json.dumps(schema_to_save, indent = 4))
+  if 'hdfs' in path:
+  # saving the patterns on the hdfs
+    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -moveFromLocal -f ./" + "%s_schema.json"%df_name + " /user/ubuntu/dataset"
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
+    output, error = process.communicate()
+    print(output)
+    print(error)
   df.write.json(path + "/%s.json"%df_name, mode="overwrite")
 
 
@@ -36,7 +45,17 @@ def load_df(path, df_name, spark):
   Returns:
     loaded_df: the loaded dataset with the loaded schema
   """
-  with open(path + "%s_schema.json"%df_name, "r") as json_file:
+  if 'hdfs' in path:
+    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -get " + path + "/%s_schema.json"%df_name + " ./"
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
+    output, error = process.communicate()
+    print(output)
+    print(error)
+    spath = './'
+  else:
+    spath = path
+    
+  with open(spath + "%s_schema.json"%df_name, "r") as json_file:
     json_obj = json.load(json_file)
     loaded_schema = StructType.fromJson(json.loads(json_obj))
   loaded_df = spark.read.format("json") \
