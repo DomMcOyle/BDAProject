@@ -220,7 +220,7 @@ if __name__ == "__main__":
         data_plus = df.filter(col("class")==target)
         print("Starting seq_scout for class " + target)
         patterns = seq_scout(df, data_plus,target, numerics_max, int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]))
-        patt_filename = "pattern_for_class_" + target + ".pickle"
+        patt_filename = "./patterns/pattern_for_class_" + target + ".pickle"
         save_patterns(patterns, patt_filename)
         
         # saving the patterns on the hdfs
