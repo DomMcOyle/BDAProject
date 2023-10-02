@@ -249,7 +249,7 @@ class PriorityQueue(object):
         for i in range(len(elem_list)):
             similar = False
             for o in output:
-                if self.similarity(elem_list[i][-1], o[-1], data)>self.theta:
+                if self.similarity(mutable_seq_copy(elem_list[i][-1]),mutable_seq_copy(o[-1]), data)>self.theta:
                     similar=True
                     break
             if not similar:
@@ -257,6 +257,7 @@ class PriorityQueue(object):
             
             if self.k is not None and len(output) == self.k:
                 break
+
         return output
         
     def similarity(self, seq1, seq2, data):
@@ -290,7 +291,7 @@ class PriorityQueue(object):
         sums = ext_data.head()
         intersection = sums["intersection"]
         union = sums["union"]
-
+        
         return intersection/union
         
        
