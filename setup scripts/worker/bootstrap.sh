@@ -20,6 +20,9 @@ cd /vagrant
 pip3 install matplotlib pandas seaborn
 # jupyter
 pip3 install jupyter
+pip3 install scikit-learn
+pip3 install pyarrow
+pip3 install xgboost
 # uncomment and modify to remove a previously installed Spark version
 # rm -rf /usr/local/spark-3.0.0-preview2-bin-hadoop2.7
 # remove any previously downloaded file
