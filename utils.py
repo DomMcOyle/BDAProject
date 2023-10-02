@@ -1,6 +1,6 @@
 """
-Python file containig utility functions for the seq_scout algorithm
-
+Python file containig utility functions for the seq scout algorithm
+and for dataframe loading and saving
 
 """
 import pickle
@@ -8,8 +8,10 @@ import heapq
 import json
 import subprocess
 from pyspark.sql.types import StructType, IntegerType, StructField
+from pyspark.sql.functions import col, udf
+from pyspark.sql.functions import sum as fsum
 
-def save_df(df, path, df_name):
+def save_df(df, path, df_name, save_locally=False):
   """
   Function to serialize a pyspark dataframe to json while also saving its schema.
 
@@ -18,14 +20,21 @@ def save_df(df, path, df_name):
     path: root directory where the files will be saved. The function will generate one json file 
           for the schema and another one for data.
     df_name: string containing the name of the dataframe to save (added to both json files)
+    save_locally: boolean indicating whether to save the dataframe locally or on the hdfs.
   """
   schema_to_save = df.schema.json()  
-  spath = './' if 'hdfs' in path else path
+  spath = './' if not save_locally else path
   with open(spath + "%s_schema.json"%df_name, "w") as json_file:
     json_file.write(json.dumps(schema_to_save, indent = 4))
-  if 'hdfs' in path:
+  if not save_locally:
   # saving the patterns on the hdfs
-    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -moveFromLocal -f ./" + "%s_schema.json"%df_name + " /user/ubuntu/dataset"
+    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -moveFromLocal -f ./" + "%s_schema.json"%df_name + " " + path
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
+    output, error = process.communicate()
+    print(output)
+    print(error)
+    # removing temp schema
+    command = "rm ./" + "%s_schema.json"%df_name 
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
     output, error = process.communicate()
     print(output)
@@ -33,7 +42,7 @@ def save_df(df, path, df_name):
   df.write.json(path + "/%s.json"%df_name, mode="overwrite")
 
 
-def load_df(path, df_name, spark):
+def load_df(path, df_name, spark, load_locally=False):
   """
   Function to load a pyspark dataframe with the relative schema.
 
@@ -42,11 +51,13 @@ def load_df(path, df_name, spark):
           serialized dataset and its schema
     df_name: string containing the name of the saved dataframe
     spark: reference to the current spark session
+    load_locally: boolean indicating whether to load the dataset from the local system (True) or from the
+                  distributed one.
   Returns:
     loaded_df: the loaded dataset with the loaded schema
   """
-  if 'hdfs' in path:
-    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -get " + path + "/%s_schema.json"%df_name + " ./"
+  if not load_locally:
+    command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -get " + path + "%s_schema.json"%df_name + " ./"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
     output, error = process.communicate()
     print(output)
@@ -62,6 +73,13 @@ def load_df(path, df_name, spark):
                         .option("header", "true") \
                         .schema(loaded_schema) \
                         .load(path + "/%s.json"%df_name)
+  if not load_locally:
+    # removing temp schema
+    command = "rm ./" + "%s_schema.json"%df_name 
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
+    output, error = process.communicate()
+    print(output)
+    print(error)
   return loaded_df
 
 
@@ -265,7 +283,7 @@ class PriorityQueue(object):
                     StructField("intersection", IntegerType(),False),
                     StructField("union", IntegerType(), False)])
         udf_jaccard = udf(lambda x,y: helper(x,y), outschema)
-        ext_data = data.select(udf_subsequence(data.input_sequence,
+        ext_data = data.select(udf_jaccard(data.input_sequence,
                                            data.enc_num_sequence).alias("tmp"))\
                                            .select(fsum("tmp.intersection").alias("intersection"),
                                                    fsum("tmp.union").alias("union"))
@@ -275,21 +293,4 @@ class PriorityQueue(object):
 
         return intersection/union
         
-        
-            #TODO add filtering
-    
-    
-    
-#            def add(self, elem):
-#        if elem[-1] not in self.seq_set:
-#            if len(self.heap)<self.k or not cap_length:
-#                heapq.heappush(self.heap, elem)
-#                self.seq_set.add(elem[-1])
-#            else:
-#                last_queue = max(self.heap, key=lambda x: x[0])
-#                if elem[0]<last_queue[0]:
-#                    
-#            if self.cap_length and len(self.heap)>self.k:
-#                self.heap = heapq.nsmallest(self.k, self.heap)
-#                self.seq_set = set([i[-1] for i in self.heap])
-#                #TODO add filtering if necessary
+       

@@ -135,7 +135,7 @@ if __name__ == "__main__":
         
     if sys.argv[1] == "gen_json":
         data = read_dataset(sys.argv[2])
-        with open("source.json", "w") as file:
+        with open(os.path.split(sys.argv[2])[0] + "/source.json", "w") as file:
             file.write(json.dumps(data))
             
     elif sys.argv[1] == "gen_dataframe": 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         # saving the test
         save_df(test_df, sys.argv[2], "processed_test")
         
-        spark.quit()
+        spark.stop()
     else:
         print("ERROR: wrong arguments. add \"gen_json\" or \"gen_dataframe\" and the respective target folder")
     

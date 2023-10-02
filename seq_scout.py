@@ -200,7 +200,7 @@ if __name__ == "__main__":
     spark = SparkSession.builder.appName("RocketLeagueFEseq").getOrCreate()
     
     
-    df = load_df('processed_df', "hdfs://hdmaster:9000/user/ubuntu/dataset/processed_df", spark)
+    df = load_df("/user/ubuntu/dataset/", 'processed_df', spark)
     classes = df.select(col("class")).distinct().collect()
     class_list = [c["class"] for c in classes]
     # remove the noise class
@@ -220,9 +220,9 @@ if __name__ == "__main__":
         data_plus = df.filter(col("class")==target)
         print("Starting seq_scout for class " + target)
         patterns = seq_scout(df, data_plus,target, numerics_max, int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]))
-        patt_filename = "./patterns/pattern_for_class_" + target + ".pickle"
+        patt_filename = "./pattern_for_class_" + target + ".pickle"
         save_patterns(patterns, patt_filename)
-        
+        print(patterns)
         # saving the patterns on the hdfs
         command = "/usr/local/hadoop-3.3.4/bin/hdfs dfs -moveFromLocal -f ./" +  patt_filename + " /user/ubuntu/dataset"
         process = subprocess.Popen(command.split(), stdout=subprocess.PIPE) 
